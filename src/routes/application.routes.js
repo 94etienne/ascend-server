@@ -5,8 +5,8 @@ import {
   listApplications,
   updateStatus,
 } from "../controllers/application.controller.js";
-import { handlePhotoUpload } from "../middleware/upload.js";
-import { requireAuth, requireRole } from "../middleware/auth.js";
+import { handleApplicationUpload } from "../middleware/upload.js";
+import { requireAuth, requireRole, attachUser } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -23,7 +23,7 @@ const submitLimit = rateLimit({
 });
 
 /* PUBLIC — the Apply form */
-router.post("/", submitLimit, handlePhotoUpload, createApplication);
+router.post("/", submitLimit, attachUser, handleApplicationUpload, createApplication);
 
 /* ADMIN */
 router.get("/", requireAuth, requireRole("admin"), listApplications);

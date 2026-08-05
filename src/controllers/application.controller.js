@@ -20,9 +20,9 @@ const OTHER_TRACKS = {
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 /* Delete an orphaned upload if the insert fails. */
-function cleanupPhoto(file) {
-  if (file?.path) {
-    fs.unlink(file.path, () => {});
+function cleanupFiles(...list) {
+  for (const f of list) {
+    if (f?.path) fs.unlink(f.path, () => {});
   }
 }
 
@@ -43,7 +43,13 @@ function cleanupPhoto(file) {
    ============================================================ */
 export const createApplication = asyncHandler(async (req, res) => {
   const b = req.body;
-  const photo = req.file;
+  /* Three uploads now: photo (ID badge), recommendation letter,
+     and payment receipt. multer .fields() puts them in req.files
+     keyed by field name, each an array. */
+  const files = req.files || {};
+  const photo = files.photo?.[0] || null;
+  const recommendation = files.recommendation?.[0] || null;
+  const receipt = files.receipt?.[0] || null;
 
   /* ---------- validate ---------- */
   const fullName = (b.name || "").trim();
@@ -52,21 +58,21 @@ export const createApplication = asyncHandler(async (req, res) => {
   const track = (b.track || "").trim().toUpperCase();
 
   if (!fullName || !email || !phone) {
-    cleanupPhoto(photo);
+    cleanupFiles(photo, recommendation, receipt);
     const e = new Error("Name, email, and phone are required.");
     e.status = 400;
     throw e;
   }
 
   if (!EMAIL_RE.test(email)) {
-    cleanupPhoto(photo);
+    cleanupFiles(photo, recommendation, receipt);
     const e = new Error("That email address doesn't look right.");
     e.status = 400;
     throw e;
   }
 
   if (!track) {
-    cleanupPhoto(photo);
+    cleanupFiles(photo, recommendation, receipt);
     const e = new Error("Choose what you're applying for.");
     e.status = 400;
     throw e;
@@ -78,16 +84,58 @@ export const createApplication = asyncHandler(async (req, res) => {
   let trackLabel = OTHER_TRACKS[track];
   if (!trackLabel) {
     const [rows] = await pool.query(
-      `SELECT name FROM programs WHERE code = ? AND is_active = TRUE LIMIT 1`,
+      `SELECT name, is_active, apply_deadline FROM programs WHERE code = ? LIMIT 1`,
       [track]
     );
     if (!rows.length) {
-      cleanupPhoto(photo);
+      cleanupFiles(photo, recommendation, receipt);
       const e = new Error(`Unknown track "${track}".`);
       e.status = 400;
       throw e;
     }
+    /* Closed if the admin closed it OR the application deadline has
+       passed. Either way, reject — even a direct POST past the
+       hidden button. */
+    const dl = rows[0].apply_deadline;
+    const past = dl && new Date(String(dl).slice(0,10) + "T23:59:59") < new Date(new Date().setHours(0,0,0,0));
+    if (!rows[0].is_active || past) {
+      cleanupFiles(photo, recommendation, receipt);
+      const e = new Error("This one is currently closed for enrolment. Please check back soon.");
+      e.status = 409;
+      throw e;
+    }
     trackLabel = `${track} — ${rows[0].name}`;
+  }
+
+  /* ---------- documents required (both letter & receipt) ---------- */
+  if (!recommendation) {
+    cleanupFiles(photo, recommendation, receipt);
+    const e = new Error("Please attach your recommendation letter.");
+    e.status = 400;
+    throw e;
+  }
+  if (!receipt) {
+    cleanupFiles(photo, recommendation, receipt);
+    const e = new Error("Please attach your payment receipt.");
+    e.status = 400;
+    throw e;
+  }
+
+  /* ---------- no duplicate live application to the same track ----------
+     A user may only hold ONE non-rejected application per track.
+     If their previous one was rejected, they may apply again. */
+  if (req.user?.sub) {
+    const [dupes] = await pool.query(
+      `SELECT id FROM applications
+       WHERE user_id = ? AND track = ? AND status <> 'rejected' LIMIT 1`,
+      [req.user.sub, track]
+    );
+    if (dupes.length) {
+      cleanupFiles(photo, recommendation, receipt);
+      const e = new Error("You already have an application for this one. Check your dashboard for its status.");
+      e.status = 409;
+      throw e;
+    }
   }
 
   /* ---------- transaction ---------- */
@@ -110,8 +158,9 @@ export const createApplication = asyncHandler(async (req, res) => {
          school, department, reg_no, year_of_study,
          supervisor_name, supervisor_email,
          internship_start, internship_end, photo_path,
+         recommendation_path, receipt_path,
          message
-       ) VALUES (?,?,?,?,?,?, ?,?,?,?,?,?, ?,?,?,?, ?,?, ?,?,?, ?)`,
+       ) VALUES (?,?,?,?,?,?, ?,?,?,?,?,?, ?,?,?,?, ?,?, ?,?,?, ?,?, ?)`,
       [
         track,
         fullName,
@@ -138,6 +187,8 @@ export const createApplication = asyncHandler(async (req, res) => {
         b.internshipStart || null,
         b.internshipEnd || null,
         photo ? photo.path : null,
+        recommendation ? recommendation.path : null,
+        receipt ? receipt.path : null,
 
         b.message || null,
       ]
@@ -195,7 +246,7 @@ export const createApplication = asyncHandler(async (req, res) => {
     await conn.commit();
   } catch (err) {
     await conn.rollback();
-    cleanupPhoto(photo);
+    cleanupFiles(photo, recommendation, receipt);
 
     /* Duplicate key = they already applied with this email today */
     if (err.code === "ER_DUP_ENTRY") {

@@ -98,13 +98,11 @@ export async function renderCertificate(cert, verifyUrl, stream) {
 
   /* signature (right) */
   const sigX = W - 240, sigY = H - 130;
-  doc.fillColor(SLATE).font("Helvetica").fontSize(7)
-     .text("Digitally signed by:", sigX, sigY - 14, { width: 170, align: "center" });
   doc.moveTo(sigX, sigY).lineTo(sigX + 170, sigY).lineWidth(0.75).stroke(INK);
   doc.fillColor(INK).font("Helvetica-Bold").fontSize(10)
      .text("NTAMBARA Etienne", sigX, sigY + 6, { width: 170, align: "center" });
   doc.fillColor(SLATE).font("Helvetica").fontSize(8)
-     .text("Director, Ascend AI", sigX, sigY + 20, { width: 170, align: "center" });
+     .text("Director, AscendAI-Labs", sigX, sigY + 20, { width: 170, align: "center" });
 
   doc.end();
 }

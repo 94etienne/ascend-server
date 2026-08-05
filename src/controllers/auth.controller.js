@@ -125,6 +125,13 @@ function toApp(r) {
     school: r.school, department: r.department, regNo: r.reg_no,
     internshipStart: r.internship_start, internshipEnd: r.internship_end,
     certSerial: r.cert_serial || null,
+    verificationStatus: r.verification_status || 'pending',
+    verifyNote: r.verify_note || null,
+    docFlags: {
+      photo: r.photo_status || 'ok',
+      recommendation: r.recommendation_status || 'ok',
+      receipt: r.receipt_status || 'ok',
+    },
     createdAt: r.created_at, reviewedAt: r.reviewed_at,
   };
 }
@@ -144,6 +151,8 @@ export const me = asyncHandler(async (req, res) => {
 
   const [apps] = await pool.query(
     `SELECT a.id, a.track, a.status, a.created_at, a.reviewed_at,
+            a.verification_status, a.verify_note,
+            a.photo_status, a.recommendation_status, a.receipt_status,
             a.school, a.department, a.reg_no,
             a.internship_start, a.internship_end,
             CONCAT_WS(' / ', NULLIF(a.province,''), NULLIF(a.district,''),

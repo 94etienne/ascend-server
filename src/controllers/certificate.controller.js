@@ -132,10 +132,21 @@ export const downloadCertificate = asyncHandler(async (req, res) => {
   }
   const cert = rows[0];
 
-  /* Only the holder or an admin may download. */
+  /* Holder, admin, or the mentor who supervised this intern may
+     download. Instructors legitimately need their own interns'
+     certificates. */
   const isOwner = req.user.sub === cert.user_id;
   const isAdmin = req.user.role === "admin";
-  if (!isOwner && !isAdmin) {
+  let isMentor = false;
+  if (!isOwner && !isAdmin && req.user.role === "instructor") {
+    const [m] = await pool.query(
+      `SELECT 1 FROM internships
+        WHERE user_id = ? AND mentor_id = ? LIMIT 1`,
+      [cert.user_id, req.user.sub]
+    );
+    isMentor = m.length > 0;
+  }
+  if (!isOwner && !isAdmin && !isMentor) {
     const e = new Error("This isn't your certificate."); e.status = 403; throw e;
   }
 

@@ -49,7 +49,7 @@ async function send({ to, subject, html, text }) {
   }
 
   const info = await transporter.sendMail({
-    from: `"Ascend AI" <${process.env.SMTP_USER}>`,
+    from: `"AscendAI-Labs" <${process.env.SMTP_USER}>`,
     to,
     subject,
     text,
@@ -78,7 +78,7 @@ function layout(bodyHtml) {
 </td></tr>
 
 <tr><td style="background:#EAE6DA;padding:20px 32px;font-size:12px;color:#5C6B70;line-height:1.6;">
-  Ascend AI Ltd — Huye, Southern Province, Rwanda<br>
+  AscendAI-Labs Ltd — Huye, Southern Province, Rwanda<br>
   <a href="mailto:19etienne@gmail.com" style="color:#1D4B3E;">19etienne@gmail.com</a> &nbsp;·&nbsp; +250 783 716 761
 </td></tr>
 
@@ -154,11 +154,11 @@ You can sign in with any of these:
 
 We will never email you a password, and we will never ask you for one.
 
-— Ascend AI, Huye, Rwanda`;
+— AscendAI-Labs, Huye, Rwanda`;
 
   return send({
     to,
-    subject: "Your Ascend AI application — set your password",
+    subject: "Your AscendAI-Labs application — set your password",
     html,
     text,
   });
@@ -185,16 +185,16 @@ export async function sendResetEmail({ to, fullName, resetUrl, expiresHours }) {
     </p>
   `);
 
-  const text = `Reset your Ascend AI password
+  const text = `Reset your AscendAI-Labs password
 
 ${resetUrl}
 
 Works once, expires in ${expiresHours} hours.
 If you didn't ask for this, ignore this email.
 
-— Ascend AI`;
+— AscendAI-Labs`;
 
-  return send({ to, subject: "Reset your Ascend AI password", html, text });
+  return send({ to, subject: "Reset your AscendAI-Labs password", html, text });
 }
 
 /* ============================================================

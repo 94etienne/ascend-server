@@ -114,10 +114,16 @@ export const listInternships = asyncHandler(async (req, res) => {
            (SELECT COUNT(*) FROM attendance a
               WHERE a.internship_id = i.id AND a.status = 'present') AS days_present,
            (SELECT COUNT(*) FROM attendance a
-              WHERE a.internship_id = i.id) AS days_recorded
+              WHERE a.internship_id = i.id) AS days_recorded,
+           app.status AS application_status,
+           app.track AS track,
+           c.serial AS certificate_serial,
+           c.status AS certificate_status
     FROM internships i
     JOIN users u ON u.id = i.user_id
     LEFT JOIN users m ON m.id = i.mentor_id
+    LEFT JOIN applications app ON app.id = i.application_id
+    LEFT JOIN certificates c ON c.application_id = i.application_id AND c.status = 'valid'
     WHERE 1 = 1
   `;
   const args = [];

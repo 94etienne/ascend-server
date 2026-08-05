@@ -3,52 +3,75 @@ import path from "node:path";
 import fs from "node:fs";
 import crypto from "node:crypto";
 
-const DIR = "uploads/photos";
+/* Photos go in one folder, documents (recommendation letters and
+   payment receipts) in another — keeps them easy to reason about
+   and to back up separately. */
+const PHOTO_DIR = "uploads/photos";
+const DOC_DIR = "uploads/docs";
 
-/* Create the folder on boot — multer won't do it for you,
-   and the error it throws otherwise is unhelpfully vague. */
-fs.mkdirSync(DIR, { recursive: true });
+fs.mkdirSync(PHOTO_DIR, { recursive: true });
+fs.mkdirSync(DOC_DIR, { recursive: true });
+
+const IMAGE_EXT = [".jpg", ".jpeg", ".png"];
+const DOC_EXT = [".jpg", ".jpeg", ".png", ".pdf"];
 
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, DIR),
+  destination: (_req, file, cb) => {
+    /* The passport photo is an image for the ID badge; the
+       recommendation and receipt are documents (often PDF). */
+    cb(null, file.fieldname === "photo" ? PHOTO_DIR : DOC_DIR);
+  },
 
   filename: (_req, file, cb) => {
-    /* Never trust the uploaded filename. A file called
-       "../../server.js" would otherwise let someone write
-       outside the upload folder. Generate our own name. */
+    /* Never trust the uploaded filename — generate our own so a
+       name like "../../server.js" can't escape the folder. */
     const ext = path.extname(file.originalname).toLowerCase();
-    const safe = [".jpg", ".jpeg", ".png"].includes(ext) ? ext : ".jpg";
+    const allowed = file.fieldname === "photo" ? IMAGE_EXT : DOC_EXT;
+    const safe = allowed.includes(ext) ? ext : ".dat";
     const id = crypto.randomBytes(12).toString("hex");
-    cb(null, `${Date.now()}-${id}${safe}`);
+    cb(null, `${file.fieldname}-${Date.now()}-${id}${safe}`);
   },
 });
 
 function fileFilter(_req, file, cb) {
-  if (!/^image\/(jpe?g|png)$/.test(file.mimetype)) {
-    return cb(new Error("The passport photo must be a JPG or PNG image."));
+  if (file.fieldname === "photo") {
+    if (!/^image\/(jpe?g|png)$/.test(file.mimetype)) {
+      return cb(new Error("The passport photo must be a JPG or PNG image."));
+    }
+  } else {
+    /* recommendation + receipt: image or PDF */
+    if (!/^(image\/(jpe?g|png)|application\/pdf)$/.test(file.mimetype)) {
+      return cb(
+        new Error("Documents must be a PDF, JPG, or PNG file.")
+      );
+    }
   }
   cb(null, true);
 }
 
-export const uploadPhoto = multer({
+/* Accept the three named fields, one file each. */
+export const uploadApplicationFiles = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 2 * 1024 * 1024, // 2 MB — matches MAX_PHOTO_MB on the client
-    files: 1,
+    fileSize: 5 * 1024 * 1024, // 5 MB — receipts/letters can be bigger than a photo
+    files: 3,
   },
-}).single("photo");
+}).fields([
+  { name: "photo", maxCount: 1 },
+  { name: "recommendation", maxCount: 1 },
+  { name: "receipt", maxCount: 1 },
+]);
 
-/* Wrap multer so its errors come back as clean JSON instead of
-   an HTML stack trace. */
-export function handlePhotoUpload(req, res, next) {
-  uploadPhoto(req, res, (err) => {
+/* Wrap multer so its errors come back as clean JSON. */
+export function handleApplicationUpload(req, res, next) {
+  uploadApplicationFiles(req, res, (err) => {
     if (!err) return next();
 
     if (err.code === "LIMIT_FILE_SIZE") {
       return res
         .status(400)
-        .json({ error: "That photo is too large. Keep it under 2 MB." });
+        .json({ error: "A file is too large. Keep each under 5 MB." });
     }
     return res.status(400).json({ error: err.message });
   });
