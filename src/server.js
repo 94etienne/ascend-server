@@ -30,7 +30,7 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
 }
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
-app.use(cors({ origin: process.env.CLIENT_ORIGIN || "http://localhost:5173", credentials: true }));
+app.use(cors({ origin: process.env.CLIENT_ORIGIN || "https://ascend-ai-26wx.vercel.app", credentials: true }));
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use("/api", rateLimit({ windowMs: 15*60*1000, max: 300, standardHeaders: true, legacyHeaders: false,
@@ -39,12 +39,12 @@ app.use((req,_res,next)=>{ console.log(`${req.method} ${req.originalUrl}`); next
 
 app.get("/api/health", (_req,res)=>res.json({ ok:true, service:"ascend-api", time:new Date().toISOString() }));
 app.use("/api/programs", programRoutes);
-  app.use("/api/stats", statsRoutes);
+app.use("/api/stats", statsRoutes);
 app.use("/api/applications", applicationRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/certificates", certificateRoutes);
 app.use("/api/documents", documentRoutes);
-  app.use("/api/me", profileRoutes);
+app.use("/api/me", profileRoutes);
 app.use("/api/internships", internshipRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/admin", adminRoutes);
